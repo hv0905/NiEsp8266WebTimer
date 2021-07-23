@@ -48,11 +48,21 @@ static const char ntpServerName[] = "ntp1.aliyun.com"; //NTP服务器，阿里�
 WiFiUDP Udp;
 unsigned int localPort = 8888; // 用于侦听UDP数据包的本地端口
 
+const char *AP_NAME = "EdgeNekoTimerAP"; //自定义8266AP热点名
+//配网及目标日期设定html页面
+const char *page_html = "<!doctypehtml><html lang=en><head><meta charset=UTF-8><meta content=\"IE=edge\"http-equiv=X-UA-Compatible><meta content=\"width=device-width,initial-scale=1\"name=viewport><title>8266配置页面</title><style>h1{text-align:center}.section{font-weight:500;font-size:1.5em;text-align:center;margin-top:2rem}input{display:block;width:calc(100% - 16px);outline:0;padding:8px}input[type=submit]{width:100%;margin-top:2rem}</style></head><body><h1>ESP8266配置页面</h1><form action=/ method=POST name=input><div class=section>wifi配置</div><label for=ssid>Wifi名称</label> <input id=ssid name=ssid value='${wifi_ssid}'> <label for=wifipass>WiFi密码</label> <input id=wifipass name=password value='${wifi_pw}'><div class=section>时间配置</div><label for=timezone>时区</label> <input id=timezone name=timezone type=number value='${timezone}'><div class=section>倒计日配置</div><label for=deadline>倒计日结束时间</label> <input id=deadline name=deadline type=date> <input type=submit value=提交></form></body></html>";
+const byte DNS_PORT = 53;       //DNS端口号默认为53
+IPAddress apIP(192, 168, 4, 1); //8266 APIP
+DNSServer dnsServer;
+ESP8266WebServer server(80);
+
 time_t getNtpTime();
 void sendNTPpacket(IPAddress &address);
 void oledClockDisplay();
 void sendCommand(int command, int value);
 void initdisplay();
+
+time_t prevDisplay = 0; //当时钟已经显示
 
 boolean isNTPConnected = false;
 
@@ -63,9 +73,11 @@ const unsigned char liu[] U8X8_PROGMEM = {
     0x40, 0x00, 0x80, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xFF, 0x7F, 0x00, 0x00, 0x00, 0x00,
     0x20, 0x02, 0x20, 0x04, 0x10, 0x08, 0x10, 0x10, 0x08, 0x10, 0x04, 0x20, 0x02, 0x20, 0x00, 0x00}; /*六*/
 
+const int DEFAULT_VERSION = 1;
 typedef struct
-{                  //存储配置结构体
-    int tz;        //时间戳
+{
+    int version;
+    int tz; //时间戳
     char wifi_ssid[64];
     char wifi_pw[64];
 } config_type;
@@ -92,57 +104,35 @@ void loadConfig()
     {
         *(p + i) = EEPROM.read(i);
     }
+    if (config.version != DEFAULT_VERSION) {
+        // reset config
+        config = {};
+        config.tz = 8;
+        config.version = DEFAULT_VERSION;
+    }
 }
 
-void printConfig() {
-  Serial.println("===CONFIG===");
-  Serial.print("TimeZone: ");
-  Serial.printf("%d\n",config.tz);
-  Serial.print("WIFI SSID: ");
-  Serial.println(config.wifi_ssid);
-  Serial.print("WIFI Password: ");
-  Serial.println(config.wifi_pw);
-Serial.println("===END CONFIG===");
+void printConfig()
+{
+    Serial.println("===CONFIG===");
+    Serial.print("TimeZone: ");
+    Serial.printf("%d\n", config.tz);
+    Serial.print("WIFI SSID: ");
+    Serial.println(config.wifi_ssid);
+    Serial.print("WIFI Password: ");
+    Serial.println(config.wifi_pw);
+    Serial.println("===END CONFIG===");
 }
-
-// char sta_ssid[32] = {0};          //暂存WiFi名
-// char sta_password[64] = {0};      //暂存WiFi密码
-const char *AP_NAME = "EdgeNekoTimerAP"; //自定义8266AP热点名
-//配网及目标日期设定html页面
-const char *page_html = "\
-<!DOCTYPE html>\r\n\
-<html lang='en'>\r\n\
-<head>\r\n\
-  <meta charset='UTF-8'>\r\n\
-  <meta name='viewport' content='width=device-width, initial-scale=1.0'>\r\n\
-  <title>Document</title>\r\n\
-</head>\r\n\
-<body>\r\n\
-  <h1>ESP8266配置页</h1>\r\n\
-  <form name='input' action='/' method='POST'>\r\n\
-    WiFi名称:\r\n\
-    <input type='text' name='ssid'><br>\r\n\
-    WiFi密码:\r\n\
-    <input type='text' name='password'><br>\r\n\
-    时区(-12~12, 默认为8——北京时间):<br>\r\n\
-    <input type='text' name='timezone' value='8'><br>\r\n\
-    <input type='submit' value='提交'>\r\n\
-    <br><br>\r\n\
-    <a href='https://space.bilibili.com/751219'>FlyAkari</a> 当前版本V2\r\n\
-  </form>\r\n\
-</body>\r\n\
-</html>\r\n\
-";
-const byte DNS_PORT = 53;       //DNS端口号默认为53
-IPAddress apIP(192, 168, 4, 1); //8266 APIP
-DNSServer dnsServer;
-ESP8266WebServer server(80);
 
 void connectWiFi();
 
 void handleRoot()
 {
-    server.send(200, "text/html", page_html);
+    String result = String(page_html);
+    result.replace("${wifi_ssid}",config.wifi_ssid);
+    result.replace("${wifi_pw}",config.wifi_pw);
+    result.replace("${timezone}", String(config.tz).c_str());
+    server.send(200, "text/html", result);
 }
 void handleRootPost()
 {
@@ -195,15 +185,26 @@ void handleRootPost()
         Serial.print("isClock:");
         Serial.println(server.arg("clock"));
     }
-    server.send(200, "text/html", "<meta charset='UTF-8'>提交成功"); //返回保存成功页面
+    server.send(200, "text/html", "<meta charset='UTF-8'>设定完成"); //返回保存成功页面
     delay(2000);
     //一切设定完成，连接wifi
     saveConfig();
     connectWiFi();
 }
 
+void startServer()
+{
+    server.on("/", HTTP_GET, handleRoot);      //设置主页回调函数
+    server.onNotFound(handleRoot);             //设置无法响应的http请求的回调函数
+    server.on("/", HTTP_POST, handleRootPost); //设置Post请求回调函数
+    server.begin();                            //启动WebServer
+    Serial.println("WebServer started!");
+}
+
 void connectWiFi()
 {
+    Serial.print("persistent: ");
+    Serial.println(WiFi.getPersistent());
     WiFi.mode(WIFI_STA);       //切换为STA模式
     WiFi.setAutoConnect(true); //设置自动连接
     WiFi.begin(config.wifi_ssid, config.wifi_pw);
@@ -223,19 +224,13 @@ void connectWiFi()
             {
                 Serial.println("ESP8266 SoftAP is on");
             }
-            server.on("/", HTTP_GET, handleRoot);      //设置主页回调函数
-            server.onNotFound(handleRoot);             //设置无法响应的http请求的回调函数
-            server.on("/", HTTP_POST, handleRootPost); //设置Post请求回调函数
-            server.begin();                            //启动WebServer
-            Serial.println("WebServer started!");
             if (dnsServer.start(DNS_PORT, "*", apIP))
             { //判断将所有地址映射到esp8266的ip上是否成功
                 Serial.println("start dnsserver success.");
             }
             else
                 Serial.println("start dnsserver failed.");
-            Serial.println("Please reset your WiFi setting.");
-            Serial.println("Connect the WiFi named flyAkari, the configuration page will pop up automatically, if not, use your browser to access 192.168.4.1");
+            Serial.println("AP Mode started. Please connect to Default AP and change the settings.");
             break; //启动WebServer后便跳出while循环，回到loop
         }
         Serial.print(".");
@@ -275,7 +270,7 @@ void setup()
     Serial.println("Designed by flyAkari");
     initdisplay();
     u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_unifont_t_chinese2);
+    u8g2.setFont(u8g2_font_unifont_t_chinese3);
     u8g2.setCursor(0, 14);
     u8g2.print("Waiting for WiFi");
     u8g2.setCursor(0, 30);
@@ -292,6 +287,8 @@ void setup()
     Serial.print("Connecting WiFi...");
     WiFi.hostname("EdgeNeko_DigitalClock");
     connectWiFi();
+    Serial.print("Starting web server...");
+    startServer();
     Serial.println("Starting UDP");
     Udp.begin(localPort);
     Serial.print("Local port: ");
@@ -300,8 +297,6 @@ void setup()
     setSyncProvider(getNtpTime);
     setSyncInterval(300); //每300秒同步一次时间
 }
-
-time_t prevDisplay = 0; //当时钟已经显示
 
 void loop()
 {
@@ -335,25 +330,33 @@ void oledClockDisplay()
     weekdays = weekday();
     Serial.printf("%d/%d/%d %d:%d:%d Weekday:%d\n", years, months, days, hours, minutes, seconds, weekdays);
     u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_unifont_t_chinese2);
+    u8g2.setFont(u8g2_font_unifont_t_chinese3);
     u8g2.setCursor(0, 14);
     if (isNTPConnected)
     {
-        if(config.tz>=0)
+        if (hours >= 12)
         {
-            u8g2.print("当前时间(UTC+");
+            u8g2.print("下午   ");
+        }
+        else
+        {
+            u8g2.print("上午   ");
+        }
+        if (config.tz >= 0)
+        {
+            u8g2.print("(UTC+");
             u8g2.print(config.tz);
             u8g2.print(")");
         }
         else
         {
-            u8g2.print("当前时间(UTC");
+            u8g2.print("(UTC");
             u8g2.print(config.tz);
             u8g2.print(")");
         }
     }
     else
-        u8g2.print("无网络!"); //如果上次对时失败，则会显示无网络
+        u8g2.print("检查网络连接"); //如果上次对时失败，则会显示无网络
     String currentTime = "";
     if (hours < 10)
         currentTime += 0;
@@ -381,7 +384,7 @@ void oledClockDisplay()
     u8g2.setCursor(0, 44);
     u8g2.print(currentTime);
     u8g2.setCursor(0, 61);
-    u8g2.setFont(u8g2_font_unifont_t_chinese2);
+    u8g2.setFont(u8g2_font_unifont_t_chinese3);
     u8g2.print(currentDay);
     u8g2.drawXBM(80, 48, 16, 16, xing);
     u8g2.setCursor(95, 62);

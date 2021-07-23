@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
+    <title>8266配置页面</title>
+    <style>
+        h1 {
+            text-align: center;
+        }
+        .section {
+            font-weight: 500;
+            font-size: 1.5em;
+            text-align: center;
+            margin-top: 2rem;
+        }
+        input {
+            display: block;
+            width: calc(100% - 16px);
+            outline: none;
+            padding: 8px;
+        }
+
+        input[type=submit] {
+            width: 100%;
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <h1>ESP8266配置页面</h1>
+    <form name='input' action='/' method='POST'>
+        <div class="section">wifi配置</div>
+        <label for="ssid">Wifi名称</label>
+        <input id="ssid" type='text' name='ssid'/>
+        <label for="wifipass">WiFi密码</label>
+        <input id="wifipass" type='text' name='password'/>
+
+        <div class="section">时间配置</div>
+        <label for="timezone">时区</label>
+        <input id="timezone" type='number' name='timezone' value='8'/>
+
+        <div class="section">倒计日配置</div>
+        <input type="checkbox" name="enable_countdown"/>
+        <label for="deadline">倒计日结束时间</label>
+        <input id="deadline" type="date" name="deadline"/>
+        <label for="countdownReason">倒计日内容</label>
+        <input id="countdownReason" type="text" name="countdownReason"/>
+
+        <input type='submit' value='应用本页面设定'/>
+    </form>
+</body>
+</html>
