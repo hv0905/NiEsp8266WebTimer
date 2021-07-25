@@ -1,21 +1,28 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
     <title>8266配置页面</title>
     <style>
+        html {
+            background: #f5f6fa;
+        }
         h1 {
             text-align: center;
         }
+
         .section {
             font-weight: 500;
             font-size: 1.5em;
             text-align: center;
             margin-top: 2rem;
+            color: #fb7299;
         }
-        input {
+
+        input:not(input[type=checkbox]) {
             display: block;
             width: calc(100% - 16px);
             outline: none;
@@ -23,32 +30,37 @@
         }
 
         input[type=submit] {
-            width: 100%;
+            width: 100% !important;
             margin-top: 2rem;
         }
     </style>
 </head>
+
 <body>
     <h1>ESP8266配置页面</h1>
-    <form name='input' action='/' method='POST'>
+    <form name="input" action="/" method="POST">
         <div class="section">wifi配置</div>
-        <label for="ssid">Wifi名称</label>
-        <input id="ssid" type='text' name='ssid'/>
+        <label for="ssid">Wifi名称(SSID)</label>
+        <input id="ssid" type="text" name="wifi_ssid" value="${wifi_ssid}" maxlength="32" />
         <label for="wifipass">WiFi密码</label>
-        <input id="wifipass" type='text' name='password'/>
+        <input id="wifipass" type="text" name="wifi_pw" value="${wifi_pw}" maxlength="32" />
 
         <div class="section">时间配置</div>
         <label for="timezone">时区</label>
-        <input id="timezone" type='number' name='timezone' value='8'/>
+        <input id="timezone" type="number" name="timezone" value="${timezone}" max="12" min="-12" />
 
         <div class="section">倒计日配置</div>
-        <input type="checkbox" name="enable_countdown"/>
-        <label for="deadline">倒计日结束时间</label>
-        <input id="deadline" type="date" name="deadline"/>
-        <label for="countdownReason">倒计日内容</label>
-        <input id="countdownReason" type="text" name="countdownReason"/>
+        <div>
+            <input id="enable_countdown" type="checkbox" name="enable_countdown" />
+            <label for="enable_countdown">启用倒计日</label>
+        </div>
+        <label for="countdown_deadline">倒计日结束时间</label>
+        <input id="countdown_deadline" type="date" name="countdown_deadline" value="${countdown_deadline}"/>
+        <label for="countdown_description">倒计日内容(不应过长)</label>
+        <input id="countdown_description" type="text" name="countdown_description" maxlength="32" value="${countdown_description}"/>
 
-        <input type='submit' value='应用本页面设定'/>
+        <input type="submit" value="应用本页面设定" />
     </form>
 </body>
+
 </html>

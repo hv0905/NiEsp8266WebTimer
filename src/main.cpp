@@ -1,85 +1,47 @@
 #include <Arduino.h>
-/* 作者：flyAkari 会飞的阿卡林 bilibili UID:751219
- * 本代码适用于ESP8266 NodeMCU + 12864显示屏
- * 7pin SPI引脚，正面看，从左到右依次为GND、VCC、D0、D1、RES、DC、CS
- *    ESP8266 ---  OLED
- *      3V    ---  VCC
- *      G     ---  GND
- *      D7    ---  D1
- *      D5    ---  D0
- *      D2orD8---  CS
- *      D1    ---  DC
- *      RST   ---  RES
- * 4pin IIC引脚，正面看，从左到右依次为GND、VCC、SCL、SDA
- *      ESP8266  ---  OLED
- *      3.3V     ---  VCC
- *      G (GND)  ---  GND
- *      D1(GPIO5)---  SCL
- *      D2(GPIO4)---  SDA
- */
-/**********************************************************************
- * 使用说明：
- * 初次上电后，用任意设备连接热点WiFi：flyAkari，等待登录页弹出或浏览器输入
- * 192.168.4.1进入WiFi及时钟配置页面，输入待连接WiFi名和密码、时区(-12~12)，
- * 填全后提交。若连接成功，则开发板会记住以上配置的信息，并在下次上电时自动连接
- * WiFi并显示时间，热点和配置页面不再出现。如需更改倒数日或WiFi信息，请关闭原
- * WiFi阻止其自动连接，上电后10秒无法登录则会重新开启热点和配置页面。
-***********************************************************************/
-
 #include <TimeLib.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <DNSServer.h>
-#include <WiFiUdp.h>
 #include <SPI.h>
 #include <EEPROM.h>
 #include <U8g2lib.h>
+#include <inttypes.h>
+#include "ntpHelper.h"
 
 #define uint unsigned int
+#define APP_FONT u8g2_font_wqy12_t_gb2312a
 
 //若屏幕使用SH1106，只需把SSD1306改为SH1106即可
 //U8G2_SSD1306_128X64_NONAME_F_4W_HW_SPI u8g2(U8G2_R0, /* cs=*/4, /* dc=*/5, /* reset=*/3);
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/U8X8_PIN_NONE);
 //U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ 4, /* data=*/ 5); //D-duino
 
-static const char ntpServerName[] = "ntp1.aliyun.com"; //NTP服务器，阿里云
-// int timeZone = 8;                                      //时区，北京时间为+8
-
-WiFiUDP Udp;
-unsigned int localPort = 8888; // 用于侦听UDP数据包的本地端口
-
 const char *AP_NAME = "EdgeNekoTimerAP"; //自定义8266AP热点名
 //配网及目标日期设定html页面
-const char *page_html = "<!doctypehtml><html lang=en><head><meta charset=UTF-8><meta content=\"IE=edge\"http-equiv=X-UA-Compatible><meta content=\"width=device-width,initial-scale=1\"name=viewport><title>8266配置页面</title><style>h1{text-align:center}.section{font-weight:500;font-size:1.5em;text-align:center;margin-top:2rem}input{display:block;width:calc(100% - 16px);outline:0;padding:8px}input[type=submit]{width:100%;margin-top:2rem}</style></head><body><h1>ESP8266配置页面</h1><form action=/ method=POST name=input><div class=section>wifi配置</div><label for=ssid>Wifi名称</label> <input id=ssid name=ssid value='${wifi_ssid}'> <label for=wifipass>WiFi密码</label> <input id=wifipass name=password value='${wifi_pw}'><div class=section>时间配置</div><label for=timezone>时区</label> <input id=timezone name=timezone type=number value='${timezone}'><div class=section>倒计日配置</div><label for=deadline>倒计日结束时间</label> <input id=deadline name=deadline type=date> <input type=submit value=提交></form></body></html>";
+const char *page_html = "<!doctypehtml><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta content=\"IE=edge\"http-equiv=\"X-UA-Compatible\"><meta content=\"width=device-width,initial-scale=1,maximum-scale=1,user-scalable=0\"name=\"viewport\"><title>8266配置页面</title><style>html{background:#f5f6fa}h1{text-align:center}.section{font-weight:500;font-size:1.5em;text-align:center;margin-top:2rem;color:#fb7299}input:not(input[type=checkbox]){display:block;width:calc(100% - 16px);outline:0;padding:8px}input[type=submit]{width:100%!important;margin-top:2rem}</style></head><body><h1>ESP8266配置页面</h1><form action=\"/\"method=\"POST\"name=\"input\"><div class=\"section\">wifi配置</div><label for=\"ssid\">Wifi名称(SSID)</label> <input value=\"${wifi_ssid}\"id=\"ssid\"name=\"wifi_ssid\"maxlength=\"32\"> <label for=\"wifipass\">WiFi密码</label> <input value=\"${wifi_pw}\"id=\"wifipass\"name=\"wifi_pw\"maxlength=\"32\"><div class=\"section\">时间配置</div><label for=\"timezone\">时区</label> <input value=\"${timezone}\"id=\"timezone\"name=\"timezone\"type=\"number\"max=\"12\"min=\"-12\"><div class=\"section\">倒计日配置</div><div><input ${enable_countdown} id=\"enable_countdown\"name=\"enable_countdown\"type=\"checkbox\"> <label for=\"enable_countdown\">启用倒计日</label></div><label for=\"countdown_deadline\">倒计日结束时间</label> <input value=\"${countdown_deadline}\"id=\"countdown_deadline\"name=\"countdown_deadline\"type=\"date\"> <label for=\"countdown_description\">倒计日内容(不应过长)</label> <input value=\"${countdown_description}\"id=\"countdown_description\"name=\"countdown_description\"maxlength=\"32\"> <input value=\"应用本页面设定\"type=\"submit\"></form></body></html>";
 const byte DNS_PORT = 53;       //DNS端口号默认为53
 IPAddress apIP(192, 168, 4, 1); //8266 APIP
 DNSServer dnsServer;
 ESP8266WebServer server(80);
 
-time_t getNtpTime();
-void sendNTPpacket(IPAddress &address);
 void oledClockDisplay();
 void sendCommand(int command, int value);
 void initdisplay();
 
 time_t prevDisplay = 0; //当时钟已经显示
 
-boolean isNTPConnected = false;
-
-const unsigned char xing[] U8X8_PROGMEM = {
-    0x00, 0x00, 0xF8, 0x0F, 0x08, 0x08, 0xF8, 0x0F, 0x08, 0x08, 0xF8, 0x0F, 0x80, 0x00, 0x88, 0x00,
-    0xF8, 0x1F, 0x84, 0x00, 0x82, 0x00, 0xF8, 0x0F, 0x80, 0x00, 0x80, 0x00, 0xFE, 0x3F, 0x00, 0x00}; /*星*/
-const unsigned char liu[] U8X8_PROGMEM = {
-    0x40, 0x00, 0x80, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0xFF, 0x7F, 0x00, 0x00, 0x00, 0x00,
-    0x20, 0x02, 0x20, 0x04, 0x10, 0x08, 0x10, 0x10, 0x08, 0x10, 0x04, 0x20, 0x02, 0x20, 0x00, 0x00}; /*六*/
-
 const int DEFAULT_VERSION = 1;
 typedef struct
 {
     int version;
-    int tz; //时间戳
-    char wifi_ssid[64];
+    int timezone;
+    char wifi_ssid[32];
     char wifi_pw[64];
+    bool enable_countdown;
+    time_t countdown_deadline;
+    char countdown_description[32];
+
 } config_type;
 config_type config;
 
@@ -95,6 +57,18 @@ void saveConfig()
     EEPROM.commit(); //此操作会消耗flash写入次数
 }
 
+int daysBetweenTwoTimestamp(time_t srcStamp, time_t dstStamp)
+{ //倒数日返回正数，正数日返回负数，同一天为0
+    if (dstStamp >= srcStamp)
+    {
+        return (dstStamp + 86399 - srcStamp) / 86400;
+    }
+    else
+    {
+        return (srcStamp - dstStamp) / 86400 * (-1);
+    }
+}
+
 void loadConfig()
 { //从"EEPROM"加载配置
     Serial.println("load config");
@@ -104,10 +78,11 @@ void loadConfig()
     {
         *(p + i) = EEPROM.read(i);
     }
-    if (config.version != DEFAULT_VERSION) {
+    if (config.version != DEFAULT_VERSION)
+    {
         // reset config
         config = {};
-        config.tz = 8;
+        config.timezone = 8;
         config.version = DEFAULT_VERSION;
     }
 }
@@ -116,7 +91,7 @@ void printConfig()
 {
     Serial.println("===CONFIG===");
     Serial.print("TimeZone: ");
-    Serial.printf("%d\n", config.tz);
+    Serial.printf("%d\n", config.timezone);
     Serial.print("WIFI SSID: ");
     Serial.println(config.wifi_ssid);
     Serial.print("WIFI Password: ");
@@ -129,18 +104,23 @@ void connectWiFi();
 void handleRoot()
 {
     String result = String(page_html);
-    result.replace("${wifi_ssid}",config.wifi_ssid);
-    result.replace("${wifi_pw}",config.wifi_pw);
-    result.replace("${timezone}", String(config.tz).c_str());
+    result.replace("${wifi_ssid}", config.wifi_ssid);
+    result.replace("${wifi_pw}", config.wifi_pw);
+    result.replace("${timezone}", String(config.timezone).c_str());
+    result.replace("${enable_countdown}", config.enable_countdown ? "checked" : "");
+    char tmpBuffer[12] = {0};
+    sprintf(tmpBuffer, "%04d-%02d-%02d", year(config.countdown_deadline), month(config.countdown_deadline), day(config.countdown_deadline));
+    result.replace("${countdown_deadline}", tmpBuffer);
+    result.replace("${countdown_description}", config.countdown_description);
     server.send(200, "text/html", result);
 }
 void handleRootPost()
 {
     Serial.println("handleRootPost");
-    if (server.hasArg("ssid"))
+    if (server.hasArg("wifi_ssid"))
     {
         Serial.print("ssid:");
-        strcpy(config.wifi_ssid, server.arg("ssid").c_str());
+        strcpy(config.wifi_ssid, server.arg("wifi_ssid").c_str());
         Serial.println(config.wifi_ssid);
     }
     else
@@ -149,10 +129,10 @@ void handleRootPost()
         server.send(200, "text/html", "<meta charset='UTF-8'>Error, SSID not found!"); //返回错误页面
         return;
     }
-    if (server.hasArg("password"))
+    if (server.hasArg("wifi_pw"))
     {
         Serial.print("password:");
-        strcpy(config.wifi_pw, server.arg("password").c_str());
+        strcpy(config.wifi_pw, server.arg("wifi_pw").c_str());
         Serial.println(config.wifi_pw);
     }
     else
@@ -172,7 +152,7 @@ void handleRootPost()
             timeZone = 8;
         }
         Serial.println(timeZone);
-        config.tz = timeZone;
+        config.timezone = timeZone;
     }
     else
     {
@@ -180,10 +160,41 @@ void handleRootPost()
         server.send(200, "text/html", "<meta charset='UTF-8'>Error, TIMEZONE not found!");
         return;
     }
-    if (server.hasArg("clock"))
+    if (server.hasArg("enable_countdown") && server.arg("enable_countdown").compareTo("on") == 0)
     {
-        Serial.print("isClock:");
-        Serial.println(server.arg("clock"));
+        // countdown enabled
+        config.enable_countdown = true;
+        if (server.hasArg("countdown_deadline"))
+        {
+            tmElements_t date;
+            int year, month, day;
+            sscanf(server.arg("countdown_deadline").c_str(), "%04d-%02d-%02d", &year, &month, &day);
+            date.Year = (uint8_t)(year - 1970);
+            date.Month = (uint8_t)month;
+            date.Day = (uint8_t)day;
+            date.Hour = date.Minute = date.Second = 0;
+            config.countdown_deadline = makeTime(date);
+            Serial.print("countdown_dateline:");
+            Serial.println(config.countdown_deadline);
+        }
+        else
+        {
+            Serial.println("[WebServer]Error, countdown_deadline not found!");
+            server.send(200, "text/html", "<meta charset='UTF-8'>Error, countdown_deadline not found!");
+            return;
+        }
+        if (server.hasArg("countdown_description"))
+        {
+            strcpy(config.countdown_description, server.arg("countdown_description").c_str());
+        }
+        else
+        {
+            memset(config.countdown_description, 0, sizeof(config.countdown_description));
+        }
+    }
+    else
+    {
+        config.enable_countdown = false;
     }
     server.send(200, "text/html", "<meta charset='UTF-8'>设定完成"); //返回保存成功页面
     delay(2000);
@@ -208,7 +219,6 @@ void connectWiFi()
     WiFi.mode(WIFI_STA);       //切换为STA模式
     WiFi.setAutoConnect(true); //设置自动连接
     WiFi.begin(config.wifi_ssid, config.wifi_pw);
-    Serial.println("");
     Serial.print("Connect WiFi");
     int count = 0;
     while (WiFi.status() != WL_CONNECTED)
@@ -255,26 +265,24 @@ void connectWiFi()
         Serial.println(WiFi.localIP());
         server.stop();
         dnsServer.stop();
-        //WiFi连接成功后，热点便不再开启，无法再次通过web配网
-        //若WiFi连接断开，ESP8266会自动尝试重新连接，直至连接成功，无需代码干预
-        //如需要更换WiFi，请在关闭原WiFi后重启ESP8266，否则上电后会自动连接原WiFi，也就无法进入配网页面
     }
 }
 
 void setup()
 {
+    pinMode(D6, INPUT_PULLUP);
+    pinMode(LED_BUILTIN, OUTPUT);
+
     Serial.begin(115200);
     while (!Serial)
         continue;
-    Serial.println("NTP Clock oled version v1.1");
-    Serial.println("Designed by flyAkari");
     initdisplay();
     u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_unifont_t_chinese3);
+    u8g2.setFont(APP_FONT);
     u8g2.setCursor(0, 14);
     u8g2.print("Waiting for WiFi");
     u8g2.setCursor(0, 30);
-    u8g2.print("connection...");
+    u8g2.print("connecting...");
     u8g2.setCursor(0, 47);
     u8g2.print("flyAkari");
     u8g2.setCursor(0, 64);
@@ -289,13 +297,12 @@ void setup()
     connectWiFi();
     Serial.print("Starting web server...");
     startServer();
-    Serial.println("Starting UDP");
-    Udp.begin(localPort);
-    Serial.print("Local port: ");
-    Serial.println(Udp.localPort());
-    Serial.println("waiting for sync");
-    setSyncProvider(getNtpTime);
+    initNtp();
+    setSyncProvider([]() -> time_t
+                    { return getNtpTime(config.timezone); });
     setSyncInterval(300); //每300秒同步一次时间
+
+    digitalWrite(LED_BUILTIN, HIGH);
 }
 
 void loop()
@@ -330,29 +337,42 @@ void oledClockDisplay()
     weekdays = weekday();
     Serial.printf("%d/%d/%d %d:%d:%d Weekday:%d\n", years, months, days, hours, minutes, seconds, weekdays);
     u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_unifont_t_chinese3);
+    u8g2.setFont(APP_FONT);
     u8g2.setCursor(0, 14);
-    if (isNTPConnected)
+    if (get_isNtpConnected())
     {
-        if (hours >= 12)
+        if (config.enable_countdown)
         {
-            u8g2.print("下午   ");
+            if (strlen(config.countdown_description) == 0) {
+                u8g2.print("距目标日");
+            } else {
+                u8g2.print(config.countdown_description);
+            }
+
+            u8g2.printf(":%d天", daysBetweenTwoTimestamp(now(), config.countdown_deadline));
         }
         else
         {
-            u8g2.print("上午   ");
-        }
-        if (config.tz >= 0)
-        {
-            u8g2.print("(UTC+");
-            u8g2.print(config.tz);
-            u8g2.print(")");
-        }
-        else
-        {
-            u8g2.print("(UTC");
-            u8g2.print(config.tz);
-            u8g2.print(")");
+            if (hours >= 12)
+            {
+                u8g2.print("下午   ");
+            }
+            else
+            {
+                u8g2.print("上午   ");
+            }
+            if (config.timezone >= 0)
+            {
+                u8g2.print("(UTC+");
+                u8g2.print(config.timezone);
+                u8g2.print(")");
+            }
+            else
+            {
+                u8g2.print("(UTC");
+                u8g2.print(config.timezone);
+                u8g2.print(")");
+            }
         }
     }
     else
@@ -384,11 +404,9 @@ void oledClockDisplay()
     u8g2.setCursor(0, 44);
     u8g2.print(currentTime);
     u8g2.setCursor(0, 61);
-    u8g2.setFont(u8g2_font_unifont_t_chinese3);
+    u8g2.setFont(APP_FONT);
     u8g2.print(currentDay);
-    u8g2.drawXBM(80, 48, 16, 16, xing);
-    u8g2.setCursor(95, 62);
-    u8g2.print("期");
+    u8g2.print("星期");
     if (weekdays == 1)
         u8g2.print("日");
     else if (weekdays == 2)
@@ -402,67 +420,6 @@ void oledClockDisplay()
     else if (weekdays == 6)
         u8g2.print("五");
     else if (weekdays == 7)
-        u8g2.drawXBM(111, 49, 16, 16, liu);
+        u8g2.print("六");
     u8g2.sendBuffer();
-}
-
-/*-------- NTP 代码 ----------*/
-
-const int NTP_PACKET_SIZE = 48;     // NTP时间在消息的前48个字节里
-byte packetBuffer[NTP_PACKET_SIZE]; // 输入输出包的缓冲区
-
-time_t getNtpTime()
-{
-    IPAddress ntpServerIP; // NTP服务器的地址
-
-    while (Udp.parsePacket() > 0)
-        ; // 丢弃以前接收的任何数据包
-    Serial.println("Transmit NTP Request");
-    // 从池中获取随机服务器
-    WiFi.hostByName(ntpServerName, ntpServerIP);
-    Serial.print(ntpServerName);
-    Serial.print(": ");
-    Serial.println(ntpServerIP);
-    sendNTPpacket(ntpServerIP);
-    uint32_t beginWait = millis();
-    while (millis() - beginWait < 1500)
-    {
-        int size = Udp.parsePacket();
-        if (size >= NTP_PACKET_SIZE)
-        {
-            Serial.println("Receive NTP Response");
-            isNTPConnected = true;
-            Udp.read(packetBuffer, NTP_PACKET_SIZE); // 将数据包读取到缓冲区
-            unsigned long secsSince1900;
-            // 将从位置40开始的四个字节转换为长整型，只取前32位整数部分
-            secsSince1900 = (unsigned long)packetBuffer[40] << 24;
-            secsSince1900 |= (unsigned long)packetBuffer[41] << 16;
-            secsSince1900 |= (unsigned long)packetBuffer[42] << 8;
-            secsSince1900 |= (unsigned long)packetBuffer[43];
-            Serial.println(secsSince1900);
-            Serial.println(secsSince1900 - 2208988800UL + config.tz * SECS_PER_HOUR);
-            return secsSince1900 - 2208988800UL + config.tz * SECS_PER_HOUR;
-        }
-    }
-    Serial.println("No NTP Response :-("); //无NTP响应
-    isNTPConnected = false;
-    return 0; //如果未得到时间则返回0
-}
-
-// 向给定地址的时间服务器发送NTP请求
-void sendNTPpacket(IPAddress &address)
-{
-    memset(packetBuffer, 0, NTP_PACKET_SIZE);
-    packetBuffer[0] = 0b11100011; // LI, Version, Mode
-    packetBuffer[1] = 0;          // Stratum, or type of clock
-    packetBuffer[2] = 6;          // Polling Interval
-    packetBuffer[3] = 0xEC;       // Peer Clock Precision
-    // 8 bytes of zero for Root Delay & Root Dispersion
-    packetBuffer[12] = 49;
-    packetBuffer[13] = 0x4E;
-    packetBuffer[14] = 49;
-    packetBuffer[15] = 52;
-    Udp.beginPacket(address, 123); //NTP需要使用的UDP端口号为123
-    Udp.write(packetBuffer, NTP_PACKET_SIZE);
-    Udp.endPacket();
 }
