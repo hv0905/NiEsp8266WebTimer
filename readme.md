@@ -35,6 +35,8 @@ D1(GPIO5)---  SCL
 D2(GPIO4)---  SDA
 ```
 
+本构建默认使用IIC接口。
+
 ### 按钮引脚
 
 BTN1(pull up): D6 用于显示一言
@@ -58,5 +60,5 @@ BTN2(pull up): D7 用于显示配置页面/重置配置
 ## 版权
 Copyright 2021 EdgeNeko  
 基于GPLv3许可开源  
-本固件在极大程度上基于[flyAkari](https://github.com/flyAkari)开发的[ESP8266_Network_Clock](https://github.com/flyAkariESP8266_Network_Clock)开发。  
+本固件在极大程度上基于[flyAkari](https://github.com/flyAkari)开发的[ESP8266_Network_Clock](https://github.com/flyAkari/ESP8266_Network_Clock)开发。  
 在此提出特别感谢。  
