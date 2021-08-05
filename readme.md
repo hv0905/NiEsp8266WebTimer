@@ -1,4 +1,3 @@
-
 # ESP8266 Network Clock
 
 ## 功能
@@ -9,7 +8,7 @@
 
 ## 安装
 
- ### 显示屏
+### 显示屏
 
 本代码适用于ESP8266 NodeMCU + 12864显示屏
 
@@ -56,3 +55,8 @@ BTN2(pull up): D7 用于显示配置页面/重置配置
 2. Wifi配置保存后， 可以通过连接同一wifi并访问设备ip方式进入配置页面. 设备ip可经由上级网关查看或短接D7-GND引脚查看.
 3. 若系统上电10秒内连接wifi失败， 用于配置的Wifi热点将重新开启， 届时设备屏幕也会指示此状态，此时可重新连接热点wifi完成配置。
 
+## 版权
+Copyright 2021 EdgeNeko  
+基于GPLv3许可开源  
+本固件在极大程度上基于[flyAkari](https://github.com/flyAkari)开发的[ESP8266_Network_Clock](https://github.com/flyAkariESP8266_Network_Clock)开发。  
+在此提出特别感谢。  
