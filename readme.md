@@ -1,5 +1,5 @@
 # ESP8266 Network Clock
-![](https://img.shields.io/github/workflow/status/hv0905/NiEsp8266WebTimer/Build?logo=github&style=flat-square)
+[![](https://img.shields.io/github/workflow/status/hv0905/NiEsp8266WebTimer/Build?logo=github&style=flat-square)](https://github.com/hv0905/NiEsp8266WebTimer/actions)
 ## 功能
 
  1. 自动联网对时
