@@ -1,4 +1,4 @@
-# ESP8266 Network Clock
+# Ni Esp8266 Web Timer
 [![](https://img.shields.io/github/workflow/status/hv0905/NiEsp8266WebTimer/Build?logo=github&style=flat-square)](https://github.com/hv0905/NiEsp8266WebTimer/actions)
 ## 功能
 
@@ -53,9 +53,15 @@ BTN2(pull up): D7 用于显示配置页面/重置配置
 
 ## 配置
 
-1. 首次上电后， 用任意设备连接热点WiFi：EspTimer，等待登录页弹出或浏览器输入`192.168.4.1` 即可进入配置页面.
+1. 首次上电后， 用任意设备连接热点WiFi：NiEspTimer，等待登录页弹出或浏览器输入`192.168.4.1` 即可进入配置页面.
 2. Wifi配置保存后， 可以通过连接同一wifi并访问设备ip方式进入配置页面. 设备ip可经由上级网关查看或短接D7-GND引脚查看.
 3. 若系统上电10秒内连接wifi失败， 用于配置的Wifi热点将重新开启， 届时设备屏幕也会指示此状态，此时可重新连接热点wifi完成配置。
+
+## 开发
+
+本项目使用platformIO为开发框架开发。
+强烈建议使用Visual Studio Code配合PlatformIO插件完成开发。
+首次导入项目可能需要下载nodemcu开发包与相关依赖。
 
 ## 版权
 Copyright 2021 EdgeNeko  
