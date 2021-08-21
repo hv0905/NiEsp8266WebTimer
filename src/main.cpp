@@ -44,6 +44,7 @@ typedef struct
     bool enable_countdown;
     time_t countdown_deadline;
     char countdown_description[32];
+    char hitokoto_url[128];
 
 } config_type;
 config_type config;
@@ -113,6 +114,7 @@ void handleRoot()
     sprintf(tmpBuffer, "%04d-%02d-%02d", year(config.countdown_deadline), month(config.countdown_deadline), day(config.countdown_deadline));
     result.replace("${countdown_deadline}", tmpBuffer);
     result.replace("${countdown_description}", config.countdown_description);
+    result.replace("${hitokoto_url}", config.hitokoto_url);
     server.send(200, "text/html", result);
 }
 void handleRootPost()
@@ -196,6 +198,9 @@ void handleRootPost()
     else
     {
         config.enable_countdown = false;
+    }
+    if (server.hasArg("hitokoto_url")) {
+        strncpy(config.hitokoto_url, server.arg("hitokoto_url").c_str(), sizeof(config.hitokoto_url));
     }
     server.send(200, "text/html", "<meta charset='UTF-8'>设定完成"); //返回保存成功页面
     delay(2000);
@@ -497,7 +502,7 @@ void HitokotoDisplay()
     u8g2.print("加载中");
     u8g2.sendBuffer();
 
-    auto hitokoto = getHitokoto();
+    auto hitokoto = getHitokoto(config.hitokoto_url);
     hitokoto.replace("。", ".");
     hitokoto.replace("，", ",");
     int len = hitokoto.length();

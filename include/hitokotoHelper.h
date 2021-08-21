@@ -6,6 +6,6 @@
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
 
-String getHitokoto();
+String getHitokoto(String url);
 
 #endif

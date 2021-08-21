@@ -2,13 +2,19 @@
 
 const char* FAILED_TXT = "连接失败.";
 
-String getHitokoto() {
+String getHitokoto(String url) {
     Serial.println("Connecting hitokoto...");
     WiFiClientSecure wifiClient;
     wifiClient.setInsecure(); // Use it since we are just getting some public data.
     // WARN: 由于Arduino限制原因，此处获取不会对https证书进行合规性检验，请谨慎用于隐私数据的拉取，或修改代码以验证网站SSL证书指纹
     HTTPClient client;
-    if (!client.begin(wifiClient, "https://v1.hitokoto.cn/?encode=text")) {
+    String conUrl;
+    if (!url.isEmpty()) {
+        conUrl = url;
+    } else {
+        conUrl = "https://v1.hitokoto.cn/?encode=text";
+    }
+    if (!client.begin(wifiClient, conUrl)) {
         Serial.println("Connect fail.");
         return String(FAILED_TXT);
     }
