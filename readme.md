@@ -63,6 +63,8 @@ BTN2(pull up): D7 用于显示配置页面/重置配置
 强烈建议使用Visual Studio Code配合PlatformIO插件完成开发。
 首次导入项目可能需要下载nodemcu开发包与相关依赖。
 
+/include/webpage.h文件由web目录下的npm项目维护。修改其中的html后运行`npm run build`完成配置页面的更新。
+
 ## 版权
 Copyright 2021 EdgeNeko  
 基于GPLv3许可开源  
