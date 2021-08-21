@@ -9,6 +9,7 @@
 #include <inttypes.h>
 #include "ntpHelper.h"
 #include "hitokotoHelper.h"
+#include "webpage.h"
 
 #define uint unsigned int
 #define APP_FONT u8g2_font_wqy12_t_gb2312a
@@ -19,8 +20,6 @@ U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/U8X8_PIN_NONE);
 //U8G2_SSD1306_128X64_NONAME_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ U8X8_PIN_NONE, /* clock=*/ 4, /* data=*/ 5); //D-duino
 
 const char *AP_NAME = "NiEspTimer"; //自定义8266AP热点名
-//配网及目标日期设定html页面
-const char *page_html = "<!doctypehtml><html lang=\"en\"><head><meta charset=\"UTF-8\"><meta content=\"IE=edge\"http-equiv=\"X-UA-Compatible\"><meta content=\"width=device-width,initial-scale=1,maximum-scale=1,user-scalable=0\"name=\"viewport\"><title>8266配置页面</title><style>html{background:#f5f6fa}h1{text-align:center}.section{font-weight:500;font-size:1.5em;text-align:center;margin-top:2rem;color:#fb7299}input:not(input[type=checkbox]){display:block;width:calc(100% - 16px);outline:0;padding:8px}input[type=submit]{width:100%!important;margin-top:2rem}</style></head><body><h1>ESP8266配置页面</h1><form action=\"/\"method=\"POST\"name=\"input\"><div class=\"section\">wifi配置</div><label for=\"ssid\">Wifi名称(SSID)</label> <input value=\"${wifi_ssid}\"id=\"ssid\"name=\"wifi_ssid\"maxlength=\"32\"> <label for=\"wifipass\">WiFi密码</label> <input value=\"${wifi_pw}\"id=\"wifipass\"name=\"wifi_pw\"maxlength=\"32\"><div class=\"section\">时间配置</div><label for=\"timezone\">时区</label> <input value=\"${timezone}\"id=\"timezone\"name=\"timezone\"type=\"number\"max=\"12\"min=\"-12\"><div class=\"section\">倒计日配置</div><div><input ${enable_countdown} id=\"enable_countdown\"name=\"enable_countdown\"type=\"checkbox\"> <label for=\"enable_countdown\">启用倒计日</label></div><label for=\"countdown_deadline\">倒计日结束时间</label> <input value=\"${countdown_deadline}\"id=\"countdown_deadline\"name=\"countdown_deadline\"type=\"date\"> <label for=\"countdown_description\">倒计日内容(不应过长)</label> <input value=\"${countdown_description}\"id=\"countdown_description\"name=\"countdown_description\"maxlength=\"32\"> <input value=\"应用本页面设定\"type=\"submit\"></form></body></html>";
 const byte DNS_PORT = 53;       //DNS端口号默认为53
 IPAddress apIP(192, 168, 4, 1); //8266 APIP
 DNSServer dnsServer;
