@@ -13,6 +13,7 @@
 
 #define uint unsigned int
 #define APP_FONT u8g2_font_wqy12_t_gb2312a
+#define TIME_FONT u8g2_font_logisoso24_tr
 
 //若屏幕使用SH1106，只需把SSD1306改为SH1106即可
 //U8G2_SSD1306_128X64_NONAME_F_4W_HW_SPI u8g2(U8G2_R0, /* cs=*/4, /* dc=*/5, /* reset=*/3);
@@ -204,11 +205,11 @@ void handleRootPost()
     }
     server.send(200, "text/html", "<meta charset='UTF-8'>设定完成"); //返回保存成功页面
     delay(2000);
-    //一切设定完成，连接wifi
     saveConfig();
-    connectWiFi();
-    if (WiFi.status() == WL_CONNECTED) {
-        initSyncer();
+    //一切设定完成，连接wifi
+    
+    if (WiFi.status() != WL_CONNECTED) {
+        ESP.restart();
     }
 }
 
@@ -216,15 +217,13 @@ void startServer()
 {
     server.on("/", HTTP_GET, handleRoot);      //设置主页回调函数
     server.onNotFound(handleRoot);             //设置无法响应的http请求的回调函数
-    server.on("/", HTTP_POST, handleRootPost); //设置Post请求回调函数
+    server.on("/saveConfig", HTTP_POST, handleRootPost); //设置Post请求回调函数
     server.begin();                            //启动WebServer
     Serial.println("WebServer started!");
 }
 
 void connectWiFi()
 {
-    Serial.print("persistent: ");
-    Serial.println(WiFi.getPersistent());
     WiFi.mode(WIFI_STA);       //切换为STA模式
     WiFi.setAutoConnect(true); //设置自动连接
     WiFi.begin(config.wifi_ssid, config.wifi_pw);
@@ -363,8 +362,8 @@ void loop()
                     u8g2.print("已重置");
                     u8g2.sendBuffer();
                     delay(2000);
+                    ESP.restart();
                 }
-                // Reset the whole config
                 break;
             }
             delay(10);
@@ -467,7 +466,7 @@ void oledClockDisplay()
         currentDay += 0;
     currentDay += days;
 
-    u8g2.setFont(u8g2_font_logisoso24_tr);
+    u8g2.setFont(TIME_FONT);
     u8g2.setCursor(0, 44);
     u8g2.print(currentTime);
     u8g2.setCursor(0, 61);

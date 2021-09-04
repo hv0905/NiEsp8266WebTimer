@@ -24,7 +24,7 @@ const cppCode = `#pragma once
 #ifndef __WEBPAGE__
 #define __WEBPAGE__
 
-const char *page_html = \"${minified.replace(/\\/g,"\\\\").replace(/\"/g,"\\\"")}\";
+const char *page_html = \"${minified.replace(/\\/g,"\\\\").replace(/\n/g,/\\n/).replace(/\"/g,"\\\"")}\";
 #endif
 `;
 
